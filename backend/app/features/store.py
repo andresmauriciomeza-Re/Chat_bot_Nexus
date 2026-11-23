@@ -228,6 +228,44 @@ class Store:
         except sqlite3.Error:
             return False, new
 
+    # ---------- banderas por usuario y uso de voz ----------
+    def get_flag(self, uid: int, key: str) -> bool:
+        if not self.ok:
+            return False
+        try:
+            return self._count(uid, "flag_" + key) > 0
+        except sqlite3.Error:
+            return False
+
+    def set_flag(self, uid: int, key: str, value: bool) -> None:
+        if not self.ok:
+            return
+        try:
+            self.db.execute("INSERT INTO counters(user_id,key,n) VALUES (?,?,?) "
+                            "ON CONFLICT(user_id,key) DO UPDATE SET n=?", (uid, "flag_" + key, int(value), int(value)))
+            self.db.commit()
+        except sqlite3.Error:
+            pass
+
+    def voice_used(self, uid: int) -> int:
+        if not self.ok:
+            return 0
+        try:
+            r = self.db.execute("SELECT xp FROM daily WHERE user_id=? AND day=? AND kind='voice'", (uid, self.today())).fetchone()
+            return r[0] if r else 0
+        except sqlite3.Error:
+            return 0
+
+    def voice_use(self, uid: int) -> None:
+        if not self.ok:
+            return
+        try:
+            self.db.execute("INSERT INTO daily(user_id,day,kind,xp) VALUES (?,?, 'voice', 1) "
+                            "ON CONFLICT(user_id,day,kind) DO UPDATE SET xp=xp+1", (uid, self.today()))
+            self.db.commit()
+        except sqlite3.Error:
+            pass
+
     # ---------- privacidad ----------
     def delete_user(self, uid: int) -> None:
         if not self.ok:

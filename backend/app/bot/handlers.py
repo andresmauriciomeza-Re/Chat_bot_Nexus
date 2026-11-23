@@ -38,6 +38,7 @@ class BotHandlers:
         self.extra_cb: dict[str, ExtraCb] = {}
         self.erasers: list[Callable[[int], None]] = []
         self.announce = self._noop_announce
+        self.listen_markup = lambda uid, chat, text: None      # boton 🔊 (Fase 5)
 
     @staticmethod
     async def _noop_announce(bot, chat, ev) -> None:
@@ -167,12 +168,17 @@ class BotHandlers:
     async def on_text(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         if not self.is_private(update):
             return                               # en grupos solo comandos
+        await self.process_text(update, ctx, update.effective_message.text or "")
+
+    async def process_text(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE, text: str, echo: bool = False) -> None:
+        """Texto escrito o transcrito de una nota de voz. El riesgo se evalua SIEMPRE primero."""
         msg, uid = update.effective_message, update.effective_user.id
-        text = msg.text or ""
         v = self.safety.check(uid, text)         # PRIORIDAD ABSOLUTA
         if v.kind in ("risk", "released"):
             await send_text(msg, v.text)
             return
+        if echo and v.kind == "ok":
+            await send_text(msg, f"🎤 Te entendí: «{esc(text[:300])}»")
         await ctx.bot.send_chat_action(msg.chat_id, ChatAction.TYPING)
         if v.kind == "guard":
             await send_text(msg, await self.safety.guard_reply(uid, text))
@@ -186,10 +192,12 @@ class BotHandlers:
 
     async def deliver(self, update: Update, reply) -> None:
         chat, uid = update.effective_chat.id, update.effective_user.id
+        speech = (reply.intro or reply.summary) if reply.kind in ("games", "compare") and reply.games else reply.text
+        listen = self.listen_markup(uid, chat, speech) if reply.kind in ("chat", "sheet", "free", "games", "compare") else None
         if self.s.cards_enabled:
-            await send_reply(update.get_bot(), chat, uid, reply, self.last, private=self.is_private(update))
+            await send_reply(update.get_bot(), chat, uid, reply, self.last, private=self.is_private(update), listen=listen)
         else:
-            await send_text(update.get_bot(), reply.text, chat_id=chat)
+            await send_text(update.get_bot(), reply.text, chat_id=chat, reply_markup=listen)
         st = self.A.get("store")
         if st and reply.kind in ("games", "sheet", "compare") and reply.games:   # busqueda real: XP con tope diario
             await self.announce(update.get_bot(), chat, st.on_search(uid))

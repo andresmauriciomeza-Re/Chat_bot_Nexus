@@ -40,15 +40,15 @@ async def send_card(bot, chat_id: int, owner: int, idx: int, g: GameInfo, trm: f
     await send_text(bot, render_game(g, trm), chat_id=chat_id, reply_markup=markup)
 
 
-async def send_reply(bot, chat_id: int, owner: int, reply: Reply, last, private: bool = True) -> None:
-    """Responde con tarjetas en chats privados; en grupos, texto simple."""
+async def send_reply(bot, chat_id: int, owner: int, reply: Reply, last, private: bool = True, listen=None) -> None:
+    """Responde con tarjetas en chats privados; en grupos, texto simple. `listen`: boton 🔊 opcional."""
     if reply.kind not in ("games", "compare") or not reply.games or not private:
-        await send_text(bot, reply.text, chat_id=chat_id)
+        await send_text(bot, reply.text, chat_id=chat_id, reply_markup=listen)
         return
     last.save(owner, chat_id, reply.kind, reply.games, reply.trm)
     if reply.intro:
-        await send_text(bot, esc(reply.intro), chat_id=chat_id)
+        await send_text(bot, esc(reply.intro), chat_id=chat_id, reply_markup=listen)
     for i, g in enumerate(reply.games):
         await send_card(bot, chat_id, owner, i, g, reply.trm)
     if reply.summary:
-        await send_text(bot, reply.summary, chat_id=chat_id)
+        await send_text(bot, reply.summary, chat_id=chat_id, reply_markup=None if reply.intro else listen)

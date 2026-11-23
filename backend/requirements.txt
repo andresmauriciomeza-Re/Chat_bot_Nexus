@@ -5,3 +5,5 @@ python-dotenv==1.2.4
 pydantic==2.14.3
 pydantic-settings==2.16.3
 openai==3.54.0
+# Fase 5: voz (edge-tts es una dependencia nueva pedida explicitamente)
+edge-tts==7.3.1

@@ -35,3 +35,14 @@ class GroqProvider:
             raise LLMUnavailableError("respuesta vacia")
         tokens = getattr(getattr(r, "usage", None), "total_tokens", 0) or 0
         return LLMResult(text=text, tokens=tokens)
+
+    async def transcribe(self, audio: bytes, filename: str = "voice.ogg", model: str = "whisper-large-v3-turbo") -> str:
+        try:
+            r = await self._client.audio.transcriptions.create(model=model, file=(filename, audio), language="es")
+        except openai.RateLimitError:
+            raise LLMRateLimitError("rate") from None
+        except openai.APITimeoutError:
+            raise LLMTimeoutError("timeout") from None
+        except (openai.APIConnectionError, openai.APIStatusError):
+            raise LLMUnavailableError("no disponible") from None
+        return (getattr(r, "text", "") or "").strip()

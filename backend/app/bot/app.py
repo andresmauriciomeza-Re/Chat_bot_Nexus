@@ -43,7 +43,7 @@ def build_services(s: Settings) -> dict:
     safety = Safety(RiskGuard(), orch, enabled=s.risk_guard_enabled)
     mascot = Mascot(s.mascot_dir(), enabled=s.main_panel_enabled, anim_enabled=s.mascot_anim_enabled,
                     store_path=s.data_path() / "mascot_ids.json")
-    return dict(settings=s, budget=budget, orch=orch, svc=svc, pipe=pipe, safety=safety, mascot=mascot,
+    return dict(settings=s, llm=llm, budget=budget, orch=orch, svc=svc, pipe=pipe, safety=safety, mascot=mascot,
                 last=LastResults(), panel=Panel(mascot, s.main_panel_enabled))
 
 
@@ -81,6 +81,8 @@ def build_application(s: Settings) -> Application:
 
 
 def install_extensions(app: Application, h: BotHandlers) -> None:
-    """Punto de enganche para modulos de fases posteriores (voz, inline, mascota que habla)."""
+    """Punto de enganche para modulos de fases posteriores (inline, mascota que habla)."""
     from ..features.install import install_features
     install_features(h.A, h)
+    from ..voice.install import install_voice
+    install_voice(app, h)

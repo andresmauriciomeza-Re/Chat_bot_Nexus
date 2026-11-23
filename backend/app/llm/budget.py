@@ -103,3 +103,17 @@ class BudgetedLLM:
             raise
         self.budget.record(user, res.tokens or est)
         return res
+
+    VOICE_TOKEN_COST = 300      # estimacion por nota de voz para el cupo
+
+    async def transcribe(self, audio: bytes, user: str | None = None, **kw) -> str:
+        reason = self.budget.check(user, self.VOICE_TOKEN_COST)
+        if reason:
+            raise LLMBudgetError(reason)
+        try:
+            text = await self.inner.transcribe(audio, **kw)
+        except LLMRateLimitError:
+            self.budget.rate_limited()
+            raise
+        self.budget.record(user, self.VOICE_TOKEN_COST)
+        return text

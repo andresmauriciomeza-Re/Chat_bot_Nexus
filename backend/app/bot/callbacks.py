@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 PANEL_TTL = 2 * 3600
 RESULT_TTL = 30 * 60
-RESULT_ACTIONS = {"fx", "sm", "cp", "fa", "sg"}       # botones de tarjetas / ultimo resultado
+RESULT_ACTIONS = {"fx", "sm", "cp", "fa", "sg", "tts", "ta"}       # botones de tarjetas / ultimo resultado
 EXPIRED_MSG = "Ese botón ya venció 😅. Ábrelo de nuevo con /menu"
 NOT_OWNER_MSG = "Ese botón es de otra persona 🙈. Abre el tuyo con /menu"
 

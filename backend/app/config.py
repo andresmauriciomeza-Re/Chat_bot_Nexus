@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     xp_daily_query_cap: int = 30
     xp_daily_trivia_cap: int = 50
 
+    # --- Fase 5: voz ---
+    voice_in_enabled: bool = True
+    voice_out_enabled: bool = True
+    voice_max_seconds: int = 60
+    voice_daily_limit: int = 10
+    voice_stt_model: str = "whisper-large-v3-turbo"
+
     # historial
     history_limit: int = 12
     llm_max_tokens: int = 350

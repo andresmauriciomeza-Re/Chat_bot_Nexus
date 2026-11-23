@@ -23,6 +23,7 @@ class LastResults:
         self.ttl, self.clock = ttl, clock
         self._d: dict[tuple[int, int], LastResult] = {}
         self._full: dict[tuple[int, int], tuple[float, str]] = {}
+        self._speech: dict[tuple[int, int], tuple[float, str]] = {}
 
     def save(self, user: int, chat: int, kind: str, games: list | None = None, trm: float | None = None,
              full_text: str | None = None, **extra) -> LastResult:
@@ -49,7 +50,19 @@ class LastResults:
             return None
         return v[1]
 
+    def save_speech(self, user: int, chat: int, text: str) -> None:
+        self._speech[(user, chat)] = (self.clock(), text)
+
+    def get_speech(self, user: int, chat: int) -> str | None:
+        v = self._speech.get((user, chat))
+        if v is None or self.clock() - v[0] > self.ttl:
+            self._speech.pop((user, chat), None)
+            return None
+        return v[1]
+
     def clear_user(self, user: int) -> None:
+        for k in [k for k in self._speech if k[0] == user]:
+            del self._speech[k]
         for k in [k for k in self._full if k[0] == user]:
             del self._full[k]
         for k in [k for k in self._d if k[0] == user]:
