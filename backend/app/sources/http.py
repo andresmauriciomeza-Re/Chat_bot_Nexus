@@ -31,14 +31,16 @@ class Http:
         if self._client is not None:
             await self._client.aclose()
 
-    async def get_json(self, url: str, params: dict | None = None, ttl: float = 300.0) -> Any | None:
+    async def get_json(self, url: str, params: dict | None = None, ttl: float = 300.0,
+                       retries: int | None = None) -> Any | None:
         """JSON o None si falla. Con TTL cachea; si falla devuelve el dato vencido si existe."""
         key = url + "?" + "&".join(f"{k}={v}" for k, v in sorted((params or {}).items()))
         now = time.monotonic()
         hit = self._cache.get(key)
         if hit and ttl > 0 and now - hit[0] < ttl:
             return hit[1]
-        for attempt in range(self.retries + 1):
+        n = self.retries if retries is None else retries
+        for attempt in range(n + 1):
             try:
                 r = await self.client().get(url, params=params, headers={"User-Agent": USER_AGENT})
                 if r.status_code == 429 or r.status_code >= 500:
@@ -50,6 +52,6 @@ class Http:
                 return data
             except (httpx.HTTPError, ValueError) as e:
                 log.warning("fuente %s fallo (%s) intento %d", url.split("/")[2], type(e).__name__, attempt + 1)
-                if attempt < self.retries:
+                if attempt < n:
                     await asyncio.sleep(self.backoff * (2 ** attempt))
         return hit[1] if hit else None

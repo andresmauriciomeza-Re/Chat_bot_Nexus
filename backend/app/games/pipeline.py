@@ -29,6 +29,7 @@ _RECO = re.compile(r"recomi[eé]nd|recomienda|sugi[eé]r|qu[eé] (?:juego|jugar)
                    r"juegos? (?:de|para|con|que)|algo (?:para|de) jugar|qu[eé] me (?:compro|recomiendas)", re.I)
 _FREE_TODAY = re.compile(r"^(?:qu[eé] hay |hay |dame |mu[eé]strame )?(?:juegos? )?(?:gratis|gratuitos?|regalados?)(?: hoy| esta semana| ahora)?\??$|"
                          r"qu[eé] (?:hay|juegos? hay) gratis|juegos? gratis (?:hoy|de hoy|esta semana)|gratis hoy", re.I)
+_SIMILAR = re.compile(r"(?:juegos?\s+)?(?:parecid\w+|similares?)\s+(?:a|al|a la|a lo)\s+(?P<n>.+)", re.I)
 _YES = re.compile(r"^\s*(s[ií]|sii+|dale|confirmo|correcto|claro|as[ií] es|ok)\b", re.I)
 _NO = re.compile(r"^\s*(no|nel|cancel\w*|mejor no)\b", re.I)
 PENDING_TTL = 300
@@ -83,6 +84,10 @@ class GamePipeline:
             a, b = clean_name(m.group("a") or m.group("a2")), clean_name(m.group("b") or m.group("b2"))
             if a and b:
                 return await self.compare(a, b)
+        if m := _SIMILAR.search(text.rstrip("?! .")):
+            n = clean_name(m.group("n"))
+            if n:
+                return await self.similar(n)
         if m := _SHEET.match(text.rstrip("?! .")):
             n = clean_name(next(x for x in m.groups() if x))
             if n:
@@ -111,6 +116,19 @@ class GamePipeline:
             return Reply("info", f"No encontré «{esc(name)}». ¿Lo escribes tal cual aparece en Steam? 🔎")
         return Reply("games", render_game(g, trm) + f"\n\n<i>{ATTRIBUTION}</i>", games=[g], trm=trm,
                      footer=ATTRIBUTION, summary=f"<i>{ATTRIBUTION}</i>")
+
+    async def similar(self, name: str) -> Reply:
+        g, trm = await asyncio.gather(self.svc.get_game(name), self.svc.cop_per_usd())
+        if not g:
+            return Reply("info", f"No encontré «{esc(name)}». ¿Lo escribes tal cual aparece en Steam? 🔎")
+        games = await self.svc.similar_games(g)
+        if not games:
+            return Reply("info", f"Todavía no tengo parecidos curados para «{esc(g.title)}» 🤷. "
+                                 "Dime un género y te recomiendo.")
+        intro = f"Si te gustó {g.title}, mira estos 🔁"
+        parts = [esc(intro), *(render_game(x, trm) for x in games), f"<i>{ATTRIBUTION}</i>"]
+        return Reply("games", "\n\n".join(parts), intro=intro, games=games, trm=trm, footer=ATTRIBUTION,
+                     summary=f"<i>{ATTRIBUTION}</i>")
 
     async def sheet(self, name: str) -> Reply:
         g, trm = await asyncio.gather(self.svc.get_game(name), self.svc.cop_per_usd())

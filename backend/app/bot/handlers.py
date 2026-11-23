@@ -25,6 +25,7 @@ from .views import HELP
 
 log = logging.getLogger(__name__)
 CONFETTI_EFFECT_ID = "5046509860389126442"
+MAINT_MSG = "🛠 Estoy en mantenimiento un ratico. Vuelvo pronto, parcero. Mientras tanto, /estado te cuenta cómo voy."
 PRIVATE_ONLY_MSG = "Eso lo hacemos por chat privado 😉 Escríbeme directo."
 RC_TAGS = {"relajado", "coop"}
 ExtraCb = Callable[["BotHandlers", Update, cbm.CB], Awaitable[None]]
@@ -57,8 +58,15 @@ class BotHandlers:
     def panel_ok(self, update: Update) -> bool:
         return self.s.main_panel_enabled and self.is_private(update)
 
-    async def blocked_by_risk(self, update: Update) -> bool:
+    async def blocked_by_risk(self, update: Update, maintenance_ok: bool = False) -> bool:
+        """True si hay que parar: guardia de riesgo (prioridad) o modo mantenimiento."""
         u = update.effective_user
+        if self.s.maintenance_mode and not maintenance_ok and not (u and self.safety.active(u.id)):
+            if update.callback_query:
+                await update.callback_query.answer(MAINT_MSG, show_alert=True)
+            else:
+                await send_text(update.effective_message, MAINT_MSG)
+            return True
         if u and self.safety.active(u.id):
             if update.callback_query:
                 await update.callback_query.answer()
@@ -120,7 +128,7 @@ class BotHandlers:
         return handler
 
     async def cmd_help(self, update, ctx) -> None:
-        if await self.blocked_by_risk(update):
+        if await self.blocked_by_risk(update, maintenance_ok=True):
             return
         await send_text(update.effective_message, HELP)
 
@@ -132,11 +140,24 @@ class BotHandlers:
         await self.after_view(update, "free")
 
     async def cmd_estado(self, update, ctx) -> None:
-        if await self.blocked_by_risk(update):
+        if await self.blocked_by_risk(update, maintenance_ok=True):
             return
+        health = await self.svc.health()
+        icon = {True: "✅", False: "⚠️", None: "⬜ apagada"}
         b = self.A["budget"]
         pct = 100 * b.remaining() // b.daily if b.enabled and b.daily else 100
-        await send_text(update.effective_message, f"✅ <b>NEXUS-IA activo</b>\n🧠 Cupo de IA de hoy: {pct}% disponible")
+        lines = ["📡 <b>Estado de NEXUS-IA</b>"]
+        lines.append("🛠 <b>En mantenimiento</b>" if self.s.maintenance_mode else "✅ Activo")
+        lines += [f"{icon[v]} {k}" for k, v in health.items()]
+        lines.append(f"🧠 Cupo de IA de hoy: {pct}% disponible")
+        tts = self.A.get("tts")
+        if tts:
+            lines.append(f"🔊 Voz: {tts.format_name}")
+        mascot = self.A.get("mascot")
+        lines.append(f"🎭 Mascota: {len(mascot.assets) if mascot else 0} archivo(s)")
+        if any(v is False for v in health.values()):
+            lines.append("<i>Si una fuente está caída, respondo con lo que tenga y te aviso qué falta.</i>")
+        await send_text(update.effective_message, "\n".join(lines))
 
     async def cmd_reset(self, update, ctx) -> None:
         self.A["orch"].reset(str(update.effective_user.id))
@@ -182,6 +203,9 @@ class BotHandlers:
         await ctx.bot.send_chat_action(msg.chat_id, ChatAction.TYPING)
         if v.kind == "guard":
             await send_text(msg, await self.safety.guard_reply(uid, text))
+            return
+        if self.s.maintenance_mode:               # el riesgo ya se atendio arriba; el resto espera
+            await send_text(msg, MAINT_MSG)
             return
         view = label_to_view(text) if self.s.main_keyboard_enabled else None
         if view:                                  # teclado fijo: antes del orquestador, sin gastar cupo

@@ -233,3 +233,28 @@ class GameService:
         scored = [s for s in scored if s[0] >= 2]
         scored.sort(key=lambda s: -s[0])
         return [c for _, c in scored[:5]]
+
+    async def health(self) -> dict[str, bool | None]:
+        """True=responde, False=caida, None=apagada por flag. Sin cache y sin reintentos (rapido)."""
+        from ..sources import cheapshark as cs_mod, epic as epic_mod, steam as steam_mod, trm as trm_mod
+        checks = {
+            "CheapShark": ("cheapshark", f"{cs_mod.BASE}/stores", None),
+            "Steam": ("steam", steam_mod.SEARCH, {"term": "hades", "cc": "CO", "l": "spanish"}),
+            "Epic": ("epic", epic_mod.URL, {"locale": "es-CO", "country": "CO"}),
+            "TRM": ("trm", trm_mod.ER_URL, None),
+        }
+
+        async def ping(key, url, params):
+            if not self.enabled.get(key, True):
+                return None
+            try:
+                return await asyncio.wait_for(self.http.get_json(url, params, ttl=0, retries=0), 6) is not None
+            except Exception:
+                return False
+        res = await asyncio.gather(*(ping(*v) for v in checks.values()))
+        return dict(zip(checks, res))
+
+    async def similar_games(self, g: GameInfo, n: int = 3) -> list[GameInfo]:
+        sims = self.similar(g)[:n]
+        got = await asyncio.gather(*(self.get_game(c["title"], c.get("appid")) for c in sims))
+        return [x for x in got if x]

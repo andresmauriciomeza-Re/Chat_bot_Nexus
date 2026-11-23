@@ -62,6 +62,12 @@ class Settings(BaseSettings):
     voice_daily_limit: int = 10
     voice_stt_model: str = "whisper-large-v3-turbo"
 
+    # --- Fase 6: inline y extras ---
+    inline_enabled: bool = True
+    inline_max_results: int = 5
+    inline_rate_per_min: int = 20
+    maintenance_mode: bool = False
+
     # historial
     history_limit: int = 12
     llm_max_tokens: int = 350
