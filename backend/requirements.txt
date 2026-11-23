@@ -1,0 +1,7 @@
+# Parte 2: Telegram + orquestador + LLM (Groq vía cliente OpenAI-compatible)
+# Python 3.15.2 · versiones directas fijadas; transitivas congeladas en requirements.lock.txt
+python-telegram-bot==22.8
+python-dotenv==1.2.4
+pydantic==2.14.3
+pydantic-settings==2.16.3
+openai==3.54.0
