@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     groq_user_daily_tokens: int = 20_000
     data_dir: str = "data"
 
+    # --- Fase 2: riesgo y robustez ---
+    risk_guard_enabled: bool = True
+    log_to_file: bool = False
+    log_dir: str = "logs"
+
     # historial
     history_limit: int = 12
     llm_max_tokens: int = 350
@@ -56,6 +61,10 @@ class Settings(BaseSettings):
 
     def data_path(self) -> Path:
         p = Path(self.data_dir)
+        return p if p.is_absolute() else BACKEND_DIR / p
+
+    def log_path(self) -> Path:
+        p = Path(self.log_dir)
         return p if p.is_absolute() else BACKEND_DIR / p
 
     def system_prompt(self) -> str:

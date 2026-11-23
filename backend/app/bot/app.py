@@ -8,11 +8,14 @@ from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandl
 
 from ..config import Settings
 from ..core.orchestrator import Orchestrator
+from ..core.risk_guard import RiskGuard
+from ..core.safety import Safety
 from ..games.pipeline import GamePipeline
 from ..games.service import GameService
 from ..llm.budget import BudgetedLLM, TokenBudget
 from ..llm.groq_provider import GroqProvider
 from ..sources.http import Http
+from ..core.safety import GUARD_SOFT
 from .send import send_text
 
 log = logging.getLogger(__name__)
@@ -34,13 +37,23 @@ def build_services(s: Settings):
     svc = GameService(Http(), enabled={"cheapshark": s.cheapshark_enabled, "steam": s.steam_enabled,
                                        "epic": s.epic_enabled, "trm": s.trm_enabled})
     pipe = GamePipeline(svc, orch, s.budget_sanity_max_cop, s.budget_sanity_max_usd)
-    return budget, orch, svc, pipe
+    safety = Safety(RiskGuard(), orch, enabled=s.risk_guard_enabled)
+    return budget, orch, svc, pipe, safety
 
 
 def build_application(s: Settings) -> Application:
     app = Application.builder().token(s.telegram_bot_token.get_secret_value()).build()
-    budget, orch, svc, pipe = build_services(s)
-    app.bot_data.update(settings=s, budget=budget, orch=orch, svc=svc, pipe=pipe)
+    budget, orch, svc, pipe, safety = build_services(s)
+    app.bot_data.update(settings=s, budget=budget, orch=orch, svc=svc, pipe=pipe, safety=safety)
+
+    def guarded(fn):
+        """Durante la guardia de riesgo, los comandos solo devuelven texto de apoyo."""
+        async def wrapper(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+            if update.effective_user and safety.active(update.effective_user.id):
+                await send_text(update.effective_message, GUARD_SOFT)
+                return
+            await fn(update, ctx)
+        return wrapper
 
     async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await send_text(update.effective_message, "¡Quiubo, parcero! 🎮 Soy <b>NEXUS-IA</b>, tu asistente de videojuegos.\n\n" + HELP)
@@ -58,18 +71,32 @@ def build_application(s: Settings) -> Application:
 
     async def text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         msg = update.effective_message
+        uid = update.effective_user.id
+        v = safety.check(uid, msg.text or "")          # PRIORIDAD ABSOLUTA: antes de todo lo demas
+        if v.kind in ("risk", "released"):
+            await send_text(msg, v.text)
+            return
+        if v.kind == "guard":
+            await ctx.bot.send_chat_action(msg.chat_id, ChatAction.TYPING)
+            await send_text(msg, await safety.guard_reply(uid, msg.text or ""))
+            return
         await ctx.bot.send_chat_action(msg.chat_id, ChatAction.TYPING)
-        r = await pipe.handle(str(update.effective_user.id), msg.text or "")
+        r = await pipe.handle(str(uid), msg.text or "")
         await send_text(msg, r.text)
 
     async def on_error(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         # solo el tipo de error: nunca el contenido de mensajes
         log.error("error en handler: %s", type(ctx.error).__name__)
+        try:
+            if isinstance(update, Update) and update.effective_message:
+                await update.effective_message.reply_text("Uy, se me cruzaron los cables. Intenta de nuevo 🙏")
+        except Exception:
+            pass
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_))
+    app.add_handler(CommandHandler("start", guarded(start)))
+    app.add_handler(CommandHandler("help", guarded(help_)))
     app.add_handler(CommandHandler("reset", reset))
-    app.add_handler(CommandHandler("gratis", gratis))
+    app.add_handler(CommandHandler("gratis", guarded(gratis)))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text))
     app.add_error_handler(on_error)
     return app
