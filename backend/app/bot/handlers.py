@@ -37,6 +37,16 @@ class BotHandlers:
         self.safety, self.pipe, self.svc, self.last = A["safety"], A["pipe"], A["svc"], A["last"]
         self.extra_cb: dict[str, ExtraCb] = {}
         self.erasers: list[Callable[[int], None]] = []
+        self.announce = self._noop_announce
+
+    @staticmethod
+    async def _noop_announce(bot, chat, ev) -> None:
+        return None
+
+    async def after_view(self, update: Update, name: str) -> None:
+        st = self.A.get("store")
+        if st and name == "free":
+            await self.announce(update.get_bot(), update.effective_chat.id, st.on_free(update.effective_user.id))
 
     # ---------- utilidades ----------
     @staticmethod
@@ -63,6 +73,7 @@ class BotHandlers:
             await send_text(update.effective_message, HELP if self.is_private(update) else PRIVATE_ONLY_MSG)
             return
         await self.panel.send(update.get_bot(), chat.id, user.id, name, arg, self.A)
+        await self.after_view(update, name)
 
     # ---------- comandos ----------
     async def cmd_start(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -117,6 +128,7 @@ class BotHandlers:
             return
         r = await self.pipe.free_today()
         await send_text(update.effective_message, r.text)
+        await self.after_view(update, "free")
 
     async def cmd_estado(self, update, ctx) -> None:
         if await self.blocked_by_risk(update):
@@ -178,6 +190,9 @@ class BotHandlers:
             await send_reply(update.get_bot(), chat, uid, reply, self.last, private=self.is_private(update))
         else:
             await send_text(update.get_bot(), reply.text, chat_id=chat)
+        st = self.A.get("store")
+        if st and reply.kind in ("games", "sheet", "compare") and reply.games:   # busqueda real: XP con tope diario
+            await self.announce(update.get_bot(), chat, st.on_search(uid))
 
     # ---------- botones ----------
     async def on_callback(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -198,6 +213,7 @@ class BotHandlers:
             if cb.action == "v":
                 if not await self.panel.edit(q.message, uid, cb.arg, "", self.A):
                     await self.panel.send(bot, chat, uid, cb.arg, "", self.A)
+                await self.after_view(update, cb.arg)
             elif cb.action == "fa":
                 full = self.last.get_full(uid, chat)
                 await send_text(bot, full or cbm.EXPIRED_MSG, chat_id=chat)

@@ -57,6 +57,7 @@ class GamePipeline:
                  clock=time.time):
         self.svc, self.orch, self.max_cop, self.max_usd, self.clock = service, orch, max_cop, max_usd, clock
         self._pending: dict[str, tuple[Filters, float]] = {}
+        self.prefs = None            # callable(user)->set[str] de generos favoritos (Fase 4)
 
     # ---- entrada principal ----
     async def handle(self, user: str, text: str) -> Reply:
@@ -142,6 +143,10 @@ class GamePipeline:
                      summary=verdict + f"\n\n<i>{ATTRIBUTION}</i>")
 
     async def recommend(self, user: str, f: Filters, confirmed: bool = False) -> Reply:
+        if self.prefs and not (f.genres or f.tags):          # sin detalles: usa sus gustos (por codigo)
+            liked = self.prefs(user)
+            if liked:
+                f.genres = set(liked)
         trm = await self.svc.cop_per_usd()
         if f.amount and f.amount.needs_confirm and not confirmed:
             self._pending[user] = (f, self.clock())

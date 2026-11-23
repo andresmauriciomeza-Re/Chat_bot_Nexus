@@ -47,6 +47,14 @@ class Settings(BaseSettings):
     welcome_anim_enabled: bool = True
     cards_enabled: bool = True
 
+    # --- Fase 4: personalizacion y gamificacion ---
+    mood_enabled: bool = True
+    likes_enabled: bool = True
+    trivia_enabled: bool = True
+    gamification_enabled: bool = True
+    xp_daily_query_cap: int = 30
+    xp_daily_trivia_cap: int = 50
+
     # historial
     history_limit: int = 12
     llm_max_tokens: int = 350

@@ -81,5 +81,6 @@ def build_application(s: Settings) -> Application:
 
 
 def install_extensions(app: Application, h: BotHandlers) -> None:
-    """Punto de enganche para modulos de fases posteriores (animo, gamificacion, voz, inline, mascota que habla)."""
-    return None
+    """Punto de enganche para modulos de fases posteriores (voz, inline, mascota que habla)."""
+    from ..features.install import install_features
+    install_features(h.A, h)
