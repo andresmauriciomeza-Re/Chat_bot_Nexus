@@ -36,14 +36,16 @@ async def send_text(bot_or_msg, text: str, chat_id: int | None = None, reply_mar
     last = None
     for i, part in enumerate(parts):
         markup = reply_markup if i == len(parts) - 1 else None
-        call = (bot_or_msg.reply_text if chat_id is None else bot_or_msg.send_message)
-        base = {} if chat_id is None else {"chat_id": chat_id}
+        if chat_id is None:
+            call, base, key = bot_or_msg.reply_text, {}, "text"
+        else:
+            call, base, key = bot_or_msg.send_message, {"chat_id": chat_id}, "text"
         try:
-            last = await _retry(call, part, parse_mode=ParseMode.HTML, reply_markup=markup,
+            last = await _retry(call, **{key: part}, parse_mode=ParseMode.HTML, reply_markup=markup,
                                 disable_web_page_preview=True, **base, **kw)
         except BadRequest as e:
             if "parse" in str(e).lower() or "entities" in str(e).lower():
-                last = await _retry(call, strip_html(part), reply_markup=markup, **base, **kw)
+                last = await _retry(call, **{key: strip_html(part)}, reply_markup=markup, **base, **kw)
             else:
                 raise
     return last

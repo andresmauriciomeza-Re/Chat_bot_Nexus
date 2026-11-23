@@ -41,6 +41,7 @@ class Reply:
     intro: str = ""
     games: list[GameInfo] = field(default_factory=list)
     footer: str = ""
+    summary: str = ""          # texto posterior a las tarjetas (totales, veredicto, atribucion)
     trm: float | None = None
     filters: Filters | None = None
 
@@ -108,7 +109,7 @@ class GamePipeline:
         if not g:
             return Reply("info", f"No encontré «{esc(name)}». ¿Lo escribes tal cual aparece en Steam? 🔎")
         return Reply("games", render_game(g, trm) + f"\n\n<i>{ATTRIBUTION}</i>", games=[g], trm=trm,
-                     footer=ATTRIBUTION)
+                     footer=ATTRIBUTION, summary=f"<i>{ATTRIBUTION}</i>")
 
     async def sheet(self, name: str) -> Reply:
         g, trm = await asyncio.gather(self.svc.get_game(name), self.svc.cop_per_usd())
@@ -124,6 +125,10 @@ class GamePipeline:
         if not ga or not gb:
             miss = a if not ga else b
             return Reply("info", f"No encontré «{esc(miss)}», así que no puedo compararlos. 🔎")
+        return self.compare_objs(ga, gb, trm)
+
+    @staticmethod
+    def compare_objs(ga: GameInfo, gb: GameInfo, trm: float | None) -> Reply:
         ca, cb = effective_cop(ga, trm), effective_cop(gb, trm)
         if ca is None or cb is None:
             verdict = "No tengo precio de alguno de los dos ahorita, así que no te digo cuál sale más barato."
@@ -133,7 +138,8 @@ class GamePipeline:
             cheap, dear, diff = (ga, gb, cb - ca) if ca < cb else (gb, ga, ca - cb)
             verdict = f"💸 Más barato ahora: <b>{esc(cheap.title)}</b> (≈ {fmt_cop(diff)} COP menos que {esc(dear.title)})."
         text = render_game(ga, trm) + "\n\n" + render_game(gb, trm) + "\n\n" + verdict + f"\n\n<i>{ATTRIBUTION}</i>"
-        return Reply("compare", text, games=[ga, gb], trm=trm, footer=ATTRIBUTION)
+        return Reply("compare", text, games=[ga, gb], trm=trm, footer=ATTRIBUTION,
+                     summary=verdict + f"\n\n<i>{ATTRIBUTION}</i>")
 
     async def recommend(self, user: str, f: Filters, confirmed: bool = False) -> Reply:
         trm = await self.svc.cop_per_usd()
@@ -162,4 +168,6 @@ class GamePipeline:
         if tl:
             parts.append(tl)
         parts.append(f"<i>{ATTRIBUTION}</i>")
-        return Reply("games", "\n\n".join(parts), intro=intro, games=games, trm=trm, footer=ATTRIBUTION, filters=f)
+        summary = (tl + "\n\n" if tl else "") + f"<i>{ATTRIBUTION}</i>"
+        return Reply("games", "\n\n".join(parts), intro=intro, games=games, trm=trm, footer=ATTRIBUTION,
+                     filters=f, summary=summary)

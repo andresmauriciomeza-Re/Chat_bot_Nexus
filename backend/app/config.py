@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     log_to_file: bool = False
     log_dir: str = "logs"
 
+    # --- Fase 3: diseno e interaccion ---
+    main_panel_enabled: bool = True
+    main_keyboard_enabled: bool = True
+    mascot_anim_enabled: bool = True
+    welcome_anim_enabled: bool = True
+    cards_enabled: bool = True
+
     # historial
     history_limit: int = 12
     llm_max_tokens: int = 350
@@ -62,6 +69,9 @@ class Settings(BaseSettings):
     def data_path(self) -> Path:
         p = Path(self.data_dir)
         return p if p.is_absolute() else BACKEND_DIR / p
+
+    def mascot_dir(self) -> Path:
+        return PROJECT_DIR / "assets" / "mascot"
 
     def log_path(self) -> Path:
         p = Path(self.log_dir)
