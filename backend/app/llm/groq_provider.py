@@ -20,7 +20,7 @@ class GroqProvider:
         self._client = AsyncOpenAI(api_key=api_key, base_url=base_url, timeout=timeout,
                                    max_retries=0, http_client=http_client)
 
-    async def complete(self, messages: list[dict], max_tokens: int = 350) -> LLMResult:
+    async def complete(self, messages: list[dict], max_tokens: int = 350, user: str | None = None) -> LLMResult:
         try:
             r = await self._client.chat.completions.create(
                 model=self.model, messages=messages, max_tokens=max_tokens, temperature=0.6)

@@ -81,13 +81,13 @@ class Fake:
     def __init__(self):
         self.calls = []
 
-    async def complete(self, messages, max_tokens=350):
+    async def complete(self, messages, max_tokens=350, user=None):
         self.calls.append(messages)
         return LLMResult("ok", 5)
 
 
 class Boom:
-    async def complete(self, messages, max_tokens=350):
+    async def complete(self, messages, max_tokens=350, user=None):
         raise LLMRateLimitError()
 
 

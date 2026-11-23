@@ -5,7 +5,7 @@ Reconstrucción del bot (la carpeta original se perdió; `app/`, `tests/` y `doc
 | Fase | Estado |
 |------|--------|
 | 0 – Base (Telegram + Groq + orquestador + memoria RAM) | ✅ |
-| 1 – Núcleo de videojuegos | ⏳ |
+| 1 – Núcleo de videojuegos | ✅ |
 | 2 – Riesgo y robustez | ⏳ |
 | 3 – Diseño e interacción | ⏳ |
 | 4 – Personalización y gamificación | ⏳ |

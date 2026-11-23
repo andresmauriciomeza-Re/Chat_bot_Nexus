@@ -22,6 +22,19 @@ class Settings(BaseSettings):
     llm_provider: str = "groq"
     log_level: str = "INFO"
 
+    # --- Fase 1: videojuegos ---
+    games_enabled: bool = True
+    cheapshark_enabled: bool = True
+    steam_enabled: bool = True
+    epic_enabled: bool = True
+    trm_enabled: bool = True
+    budget_sanity_max_cop: float = 1_000_000
+    budget_sanity_max_usd: float = 300
+    groq_budget_enabled: bool = True
+    groq_daily_token_budget: int = 160_000
+    groq_user_daily_tokens: int = 20_000
+    data_dir: str = "data"
+
     # historial
     history_limit: int = 12
     llm_max_tokens: int = 350
@@ -40,6 +53,10 @@ class Settings(BaseSettings):
         if not v.strip():
             raise ValueError("GROQ_MODEL vacio")
         return v.strip()
+
+    def data_path(self) -> Path:
+        p = Path(self.data_dir)
+        return p if p.is_absolute() else BACKEND_DIR / p
 
     def system_prompt(self) -> str:
         return (BACKEND_DIR / "prompts" / "system.txt").read_text(encoding="utf-8").strip()
