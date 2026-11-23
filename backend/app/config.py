@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     inline_rate_per_min: int = 20
     maintenance_mode: bool = False
 
+    # --- Fase 7: la mascota habla ---
+    mascot_voice_enabled: bool = True
+
     # historial
     history_limit: int = 12
     llm_max_tokens: int = 350

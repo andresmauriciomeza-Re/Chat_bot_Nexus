@@ -37,3 +37,15 @@ cd backend
 
 ## Estructura
 `backend/app/` (config, llm, core, sources, games, bot, …), `backend/tests/`, `docs/`.
+
+## Funciones
+- Recomendaciones y busqueda por texto libre (genero, plataforma, presupuesto en COP/USD), comparacion, veredicto contra el minimo historico, ficha de juego, `/gratis`.
+- Panel con mascota, teclado fijo, tarjetas con botones, animo, gustos, trivia, XP/racha/cofre/logros, voz (notas de voz y boton 🔊), modo inline, `/estado`.
+- Seguridad emocional por reglas con prioridad absoluta (123 y Linea 106).
+- Cada funcion tiene su flag en `backend\.env` (ver `backend\.env.example`).
+
+## Ejecucion con reinicio automatico
+```powershell
+.\start_bot.ps1
+```
+Reinicia con backoff si el bot se cae y escribe logs (con secretos enmascarados) en `backend\logs\`.

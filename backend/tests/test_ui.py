@@ -281,13 +281,13 @@ async def test_panel_edit_text_message_and_menu_button(tmp_path):
     msg = FakeMsg("menu", 1)
     ok = await A["panel"].edit(msg, 7, "help", "", A)
     assert ok and msg.edits
-    # todo boton de vista trae «⬅️ Menú»; la cuadricula tiene los 11 botones
+    # todo boton de vista trae «⬅️ Menú»; la cuadricula tiene los 11 botones pedidos + 💡 Consejo
     ctx = NS(user_id=7, chat_id=1, arg="", app=A)
     view = await A["panel"].build("help", ctx)
     _, markup = A["panel"].view_markup("help", view, ctx)
     assert "⬅️ Menú" in [b.text for r in markup.inline_keyboard for b in r]
     labels = [b.text for r in A["panel"].menu_markup(7).inline_keyboard for b in r]
-    assert len(labels) == 11 and "🧠 Trivia" in labels and "🔊 Voz y ajustes" in labels
+    assert len(labels) == 12 and "🧠 Trivia" in labels and "🔊 Voz y ajustes" in labels and "💡 Consejo de NEXUS" in labels
 
 
 async def test_game_buttons_expired_message(tmp_path):

@@ -21,6 +21,7 @@ from .cards import send_reply, send_card
 from .keyboard import label_to_view, main_keyboard
 from .panel import Panel
 from .send import _retry, safe_edit, send_text
+from .typing import with_typing
 from .views import HELP
 
 log = logging.getLogger(__name__)
@@ -40,6 +41,11 @@ class BotHandlers:
         self.erasers: list[Callable[[int], None]] = []
         self.announce = self._noop_announce
         self.listen_markup = lambda uid, chat, text: None      # boton 🔊 (Fase 5)
+        self.react = self._noop_react                          # reacciones de la mascota (Fase 7)
+
+    @staticmethod
+    async def _noop_react(update, event) -> None:
+        return None
 
     @staticmethod
     async def _noop_announce(bot, chat, ev) -> None:
@@ -211,8 +217,22 @@ class BotHandlers:
         if view:                                  # teclado fijo: antes del orquestador, sin gastar cupo
             await self.open_view(update, view)
             return
-        reply = await self.pipe.handle(str(uid), text)
+        reply = await with_typing(ctx.bot, msg.chat_id, self.pipe.handle(str(uid), text))
         await self.deliver(update, reply)
+
+    @staticmethod
+    def reaction_event(reply) -> str:
+        """Momento clave de una respuesta (o vacio): precio minimo, juego gratis, saludo/gracias, no encontrado."""
+        from ..personality import is_low_price
+        if reply.event:
+            return reply.event
+        if reply.kind in ("games", "sheet") and any(is_low_price(g) for g in reply.games):
+            return "low_price"
+        if reply.kind == "free" and "Epic Games (esta semana)" in reply.text:
+            return "free"
+        if reply.kind == "info" and reply.text.startswith("No encontré «"):
+            return "not_found"
+        return ""
 
     async def deliver(self, update: Update, reply) -> None:
         chat, uid = update.effective_chat.id, update.effective_user.id
@@ -225,6 +245,7 @@ class BotHandlers:
         st = self.A.get("store")
         if st and reply.kind in ("games", "sheet", "compare") and reply.games:   # busqueda real: XP con tope diario
             await self.announce(update.get_bot(), chat, st.on_search(uid))
+        await self.react(update, self.reaction_event(reply))
 
     # ---------- botones ----------
     async def on_callback(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:

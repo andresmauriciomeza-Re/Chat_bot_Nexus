@@ -14,6 +14,7 @@ from ..games.service import GameService
 from ..llm.budget import BudgetedLLM, TokenBudget
 from ..llm.groq_provider import GroqProvider
 from ..sources.http import Http
+from ..personality import PERSONA_PROMPT
 from ..tools.last_result import LastResults
 from .handlers import BotHandlers
 from .mascot import Mascot
@@ -21,6 +22,7 @@ from .panel import Panel
 from .views import register_base_views
 
 log = logging.getLogger(__name__)
+NL_ = chr(10) * 2
 
 COMMANDS = [
     ("start", "🎮 Empezar con NEXUS"), ("menu", "🏠 Abrir el menú"), ("help", "❓ Cómo usarme"),
@@ -36,7 +38,8 @@ def build_services(s: Settings) -> dict:
     budget = TokenBudget(s.groq_budget_enabled, s.groq_daily_token_budget, s.groq_user_daily_tokens,
                          path=s.data_path() / "groq_budget.json")
     llm = BudgetedLLM(GroqProvider(s.groq_api_key.get_secret_value(), s.groq_model, s.llm_timeout_s), budget)
-    orch = Orchestrator(llm, s.system_prompt(), history_limit=s.history_limit, max_tokens=s.llm_max_tokens)
+    prompt = s.system_prompt() + (NL_ + PERSONA_PROMPT if s.mascot_voice_enabled else "")
+    orch = Orchestrator(llm, prompt, history_limit=s.history_limit, max_tokens=s.llm_max_tokens)
     svc = GameService(Http(), enabled={"cheapshark": s.cheapshark_enabled, "steam": s.steam_enabled,
                                        "epic": s.epic_enabled, "trm": s.trm_enabled})
     pipe = GamePipeline(svc, orch, s.budget_sanity_max_cop, s.budget_sanity_max_usd)
@@ -81,10 +84,12 @@ def build_application(s: Settings) -> Application:
 
 
 def install_extensions(app: Application, h: BotHandlers) -> None:
-    """Punto de enganche para modulos de fases posteriores (mascota que habla)."""
+    """Punto de enganche para modulos de fases posteriores (ninguno pendiente)."""
     from ..features.install import install_features
     install_features(h.A, h)
     from ..voice.install import install_voice
     install_voice(app, h)
     from .inline import install_inline
     install_inline(app, h)
+    from .persona import install_persona
+    install_persona(app, h)

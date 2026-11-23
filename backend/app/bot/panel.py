@@ -20,7 +20,7 @@ GRID = [
     [("🏆 Mi perfil", "profile"), ("🎁 Cofre", "chest")],
     [("🧠 Trivia", "trivia"), ("💜 Mis gustos", "likes")],
     [("🤖 Conocer a NEXUS", "about"), ("🔊 Voz y ajustes", "settings")],
-    [("❓ Ayuda", "help")],
+    [("❓ Ayuda", "help"), ("💡 Consejo de NEXUS", "tip")],
 ]
 
 

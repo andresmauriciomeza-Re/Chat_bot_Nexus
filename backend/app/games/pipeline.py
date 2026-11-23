@@ -13,6 +13,7 @@ from ..sources.models import GameInfo
 from ..telegram_utils import esc
 from .budget import to_cop
 from .filters import Filters, parse_filters
+from .. import personality as persona_mod
 from .render import fmt_cop, render_free, render_game, render_sheet, total_line
 from .service import GameService, effective_cop
 
@@ -45,6 +46,7 @@ class Reply:
     summary: str = ""          # texto posterior a las tarjetas (totales, veredicto, atribucion)
     trm: float | None = None
     filters: Filters | None = None
+    event: str = ""            # momento clave para la mascota (greet, thanks, ...)
 
 
 def clean_name(s: str) -> str | None:
@@ -58,6 +60,7 @@ class GamePipeline:
                  clock=time.time):
         self.svc, self.orch, self.max_cop, self.max_usd, self.clock = service, orch, max_cop, max_usd, clock
         self._pending: dict[str, tuple[Filters, float]] = {}
+        self.persona = False         # personalidad de NEXUS (Fase 7): charla casual sin gastar tokens
         self.prefs = None            # callable(user)->set[str] de generos favoritos (Fase 4)
 
     # ---- entrada principal ----
@@ -95,10 +98,17 @@ class GamePipeline:
         if m := _PRICE.search(text):
             n = clean_name(m.group("n"))
             if n:
-                return await self.price(n)
+                return await self.price(n, advice=self.persona and persona_mod.wants_advice(text))
         f = parse_filters(text, self.max_cop, self.max_usd)
+        minutes = persona_mod.minutes_available(text) if self.persona else None
+        if minutes:
+            if minutes <= 60:
+                f.tags.add("corto")
+            return await self.recommend(user, f, lead=persona_mod.time_line(minutes))
         if f.amount or _RECO.search(text) or (f.genres and not f.empty and len(text.split()) <= 8 and "juego" in text.lower()):
             return await self.recommend(user, f)
+        if self.persona and (st := persona_mod.small_talk(text)):
+            return Reply("chat", esc(st.text), event=st.event)
         return await self.chat(user, text)
 
     # ---- acciones ----
@@ -110,12 +120,14 @@ class GamePipeline:
         epic, giv = await self.svc.free_today()
         return Reply("free", render_free(epic, giv))
 
-    async def price(self, name: str) -> Reply:
+    async def price(self, name: str, advice: bool = False) -> Reply:
         g, trm = await asyncio.gather(self.svc.get_game(name), self.svc.cop_per_usd())
         if not g:
             return Reply("info", f"No encontré «{esc(name)}». ¿Lo escribes tal cual aparece en Steam? 🔎")
-        return Reply("games", render_game(g, trm) + f"\n\n<i>{ATTRIBUTION}</i>", games=[g], trm=trm,
-                     footer=ATTRIBUTION, summary=f"<i>{ATTRIBUTION}</i>")
+        tip = persona_mod.advice_line(g) if advice else ""
+        summary = (esc(tip) + "\n\n" if tip else "") + f"<i>{ATTRIBUTION}</i>"
+        return Reply("games", render_game(g, trm) + "\n\n" + summary, games=[g], trm=trm,
+                     footer=ATTRIBUTION, summary=summary)
 
     async def similar(self, name: str) -> Reply:
         g, trm = await asyncio.gather(self.svc.get_game(name), self.svc.cop_per_usd())
@@ -160,7 +172,7 @@ class GamePipeline:
         return Reply("compare", text, games=[ga, gb], trm=trm, footer=ATTRIBUTION,
                      summary=verdict + f"\n\n<i>{ATTRIBUTION}</i>")
 
-    async def recommend(self, user: str, f: Filters, confirmed: bool = False) -> Reply:
+    async def recommend(self, user: str, f: Filters, confirmed: bool = False, lead: str = "") -> Reply:
         if self.prefs and not (f.genres or f.tags):          # sin detalles: usa sus gustos (por codigo)
             liked = self.prefs(user)
             if liked:
@@ -182,10 +194,13 @@ class GamePipeline:
                                  "Prueba subiendo el tope o quitando algún filtro 🙏", filters=f, trm=trm)
         facts = "; ".join(
             f"{g.title}" + (f" (USD {g.sale_usd:.2f})" if g.sale_usd is not None else "") for g in games)
-        intro = await self.orch.narrate(
-            user, "Escribe UNA o DOS frases cortas y parceras presentando estas recomendaciones, sin repetir precios.",
-            f"Filtros del usuario: {f.describe() or 'ninguno'}. Juegos: {facts}.")
-        intro = intro or "Mira lo que encontré para ti 🎮"
+        if lead:                       # frase de NEXUS calculada por reglas (p. ej. «tengo 30 minutos»): sin gastar tokens
+            intro = lead
+        else:
+            intro = await self.orch.narrate(
+                user, "Escribe UNA o DOS frases cortas y parceras presentando estas recomendaciones, sin repetir precios.",
+                f"Filtros del usuario: {f.describe() or 'ninguno'}. Juegos: {facts}.")
+            intro = intro or "Mira lo que encontré para ti 🎮"
         parts = [esc(intro), *(render_game(g, trm) for g in games)]
         tl = total_line(games, trm)
         if tl:
